@@ -6,4 +6,4 @@ captureHead 是 capture 的服务端，提供数据持久化和检索。
 
 ## License
 
-Keeper software is licenced under the Apache License Version 2.0. See the [LICENSE]() file for details.
+Keeper software is licenced under the Apache License Version 2.0. See the [LICENSE](https://github.com/lazecoding/captureHead/blob/main/LICENSE) file for details.
