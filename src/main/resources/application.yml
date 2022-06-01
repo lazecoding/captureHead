@@ -1,0 +1,7 @@
+server:
+  port: 9955
+  http:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
