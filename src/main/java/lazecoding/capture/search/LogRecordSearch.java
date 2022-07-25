@@ -1,13 +1,15 @@
 package lazecoding.capture.search;
 
 import lazecoding.capture.constant.IndexConstant;
-import lazecoding.capture.model.RecordInfo;
+import lazecoding.capture.exception.NilParamException;
+import lazecoding.capture.model.AppModel;
+import lazecoding.capture.model.BatchRequest;
+import lazecoding.capture.model.LogModel;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.master.AcknowledgedResponse;
@@ -17,15 +19,17 @@ import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
 import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.sort.FieldSortBuilder;
+import org.elasticsearch.search.sort.SortOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
@@ -34,16 +38,17 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
- * RecordInfoSearch
+ * LogRecordSearch
  *
  * @author lazecoding
  */
 @Service
-public class RecordInfoSearch {
+public class LogRecordSearch {
 
-    private static final Logger logger = LoggerFactory.getLogger(RecordInfoSearch.class);
+    private static final Logger logger = LoggerFactory.getLogger(LogRecordSearch.class);
 
     @Autowired
     RestHighLevelClient restHighLevelClient;
@@ -54,7 +59,7 @@ public class RecordInfoSearch {
      * @return
      */
     public boolean createIndexIfNil() {
-        String index = IndexConstant.RECORD_INFO.getIndex();
+        String index = IndexConstant.LOG_RECORD.getIndex();
         boolean isExist = false;
         try {
             isExist = restHighLevelClient.indices().exists(new GetIndexRequest(index), RequestOptions.DEFAULT);
@@ -73,7 +78,7 @@ public class RecordInfoSearch {
         CreateIndexRequest createIndexRequest = new CreateIndexRequest(index);
 
         // mapping
-        createIndexRequest.mapping(IndexConstant.RECORD_INFO.getSource(), XContentType.JSON);
+        createIndexRequest.mapping(IndexConstant.LOG_RECORD.getSource(), XContentType.JSON);
 
         // setting
         createIndexRequest.settings(Settings.builder()
@@ -103,7 +108,7 @@ public class RecordInfoSearch {
      * @return
      */
     public boolean deleteIndex() {
-        String index = IndexConstant.RECORD_INFO.getIndex();
+        String index = IndexConstant.LOG_RECORD.getIndex();
         DeleteIndexRequest deleteIndexRequest = new DeleteIndexRequest(index);
         AcknowledgedResponse acknowledgedResponse = null;
         try {
@@ -122,48 +127,18 @@ public class RecordInfoSearch {
     }
 
     /**
-     * add doc to index
-     *
-     * @param recordInfo
-     * @return
-     */
-    public boolean add(RecordInfo recordInfo) {
-        if (ObjectUtils.isEmpty(recordInfo)) {
-            return false;
-        }
-        String index = IndexConstant.RECORD_INFO.getIndex();
-        Map<String, Object> source = conversionRecordToMap(recordInfo);
-        IndexRequest indexRequest = new IndexRequest(index).source(source);
-
-        IndexResponse indexResponse = null;
-        try {
-            indexResponse = restHighLevelClient.index(indexRequest, RequestOptions.DEFAULT);
-        } catch (IOException e) {
-            logger.error("add doc to index:[" + index + "] error!", e);
-            return false;
-        } catch (ElasticsearchException e) {
-            logger.error("add doc to index:[" + index + "] error!", e);
-            return false;
-        }
-        return true;
-    }
-
-    /**
      * 把实体转化为 Map
      *
      * @return
      */
-    private Map<String, Object> conversionRecordToMap(RecordInfo recordInfo) {
-        Map<String, Object> source = new HashMap<>();
-        source.put("category", recordInfo.getCategory());
-        source.put("level", recordInfo.getLevel());
-        source.put("logInfo", recordInfo.getLogInfo());
-        source.put("deviceInfo", recordInfo.getDeviceInfo());
-        source.put("ctime", recordInfo.getCtime());
-        source.put("app", recordInfo.getApp());
-        source.put("version", recordInfo.getVersion());
-        source.put("namespace", recordInfo.getNamespace());
-        return source;
+    private void conversionRecordToMap(LogModel logModel, Map<String, Object> source) {
+        if (CollectionUtils.isEmpty(source)) {
+            return;
+        }
+        source.put("category", logModel.getCategory());
+        source.put("level", logModel.getLevel());
+        source.put("logInfo", logModel.getLogInfo());
+        source.put("ctime", logModel.getCtime());
     }
 
     /**
@@ -171,14 +146,29 @@ public class RecordInfoSearch {
      *
      * @return
      */
-    public boolean batch(List<RecordInfo> list) {
-        if (CollectionUtils.isEmpty(list)) {
-            return false;
+    public boolean batch(BatchRequest batchRequest) {
+        if (ObjectUtils.isEmpty(batchRequest)) {
+            throw new NilParamException("BatchRequest is nil");
         }
-        String index = IndexConstant.RECORD_INFO.getIndex();
+        AppModel appModel = batchRequest.getAppModel();
+        if (ObjectUtils.isEmpty(appModel)) {
+            throw new NilParamException("AppModel is nil");
+        }
+        List<LogModel> logModelList = batchRequest.getLogModelList();
+        if (CollectionUtils.isEmpty(logModelList)) {
+            throw new NilParamException("LogModelList is nil");
+        }
+        String index = IndexConstant.LOG_RECORD.getIndex();
         BulkRequest bulkRequest = new BulkRequest();
-        for (RecordInfo recordInfo : list) {
-            Map<String, Object> source = conversionRecordToMap(recordInfo);
+        Map<String, Object> source = null;
+        for (LogModel logModel : logModelList) {
+            source = new HashMap<>();
+            source.put("deviceInfo", appModel.getDeviceInfo());
+            source.put("clientId", appModel.getClientId());
+            source.put("app", appModel.getApp());
+            source.put("version", appModel.getVersion());
+            source.put("namespace", appModel.getNamespace());
+            conversionRecordToMap(logModel, source);
             IndexRequest indexRequest = new IndexRequest(index).source(source);
             bulkRequest.add(indexRequest);
         }
@@ -202,11 +192,14 @@ public class RecordInfoSearch {
      * @return
      */
     public SearchHit[] search() {
-        String index = IndexConstant.RECORD_INFO.getIndex();
+        String index = IndexConstant.LOG_RECORD.getIndex();
         // search
         SearchRequest searchRequest = new SearchRequest(index);
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.matchAllQuery());
+        searchSourceBuilder.sort(new FieldSortBuilder("ctime").order(SortOrder.DESC));
+        searchSourceBuilder.from(0).size(20);
+        searchSourceBuilder.timeout(new TimeValue(60, TimeUnit.SECONDS));
         searchRequest.source(searchSourceBuilder);
         SearchResponse searchResponse = null;
         try {

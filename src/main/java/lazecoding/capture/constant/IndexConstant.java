@@ -10,7 +10,7 @@ public enum IndexConstant {
     /**
      * 记录信息
      */
-    RECORD_INFO("record_info", "记录信息",
+    LOG_RECORD("log_record", "记录信息",
             "{\n" +
                     "  \"properties\": {\n" +
                     "    \"category\": {\n" +
@@ -22,9 +22,6 @@ public enum IndexConstant {
                     "    \"logInfo\": {\n" +
                     "      \"type\": \"text\"\n" +
                     "    },\n" +
-                    "    \"deviceInfo\": {\n" +
-                    "      \"type\": \"text\"\n" +
-                    "    },\n" +
                     "    \"ctime\": {\n" +
                     "      \"type\": \"long\"\n" +
                     "    },\n" +
@@ -32,6 +29,12 @@ public enum IndexConstant {
                     "      \"type\": \"keyword\"\n" +
                     "    },\n" +
                     "    \"version\": {\n" +
+                    "      \"type\": \"keyword\"\n" +
+                    "    },\n" +
+                    "    \"deviceInfo\": {\n" +
+                    "      \"type\": \"text\"\n" +
+                    "    },\n" +
+                    "    \"clientId\": {\n" +
                     "      \"type\": \"keyword\"\n" +
                     "    },\n" +
                     "    \"namespace\": {\n" +

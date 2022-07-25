@@ -1,7 +1,12 @@
 package lazecoding.capture.listener;
 
-import lazecoding.capture.search.RecordInfoSearch;
-import lazecoding.capture.util.BeanUtil;
+/**
+ * @author lazecoding
+ */
+
+import lazecoding.capture.search.LogRecordSearch;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -15,11 +20,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProjectStartupRunner implements ApplicationRunner {
 
+    private static final Logger logger = LoggerFactory.getLogger(ProjectStartupRunner.class);
+
     @Autowired
-    private RecordInfoSearch recordInfoSearch;
+    private LogRecordSearch logRecordSearch;
 
     @Override
     public void run(ApplicationArguments args) {
-        recordInfoSearch.createIndexIfNil();
+        try {
+            logRecordSearch.createIndexIfNil();
+        } catch (Exception e) {
+            logger.error("ProjectStartupRunner Exception", e);
+        }
     }
 }
+
