@@ -1,5 +1,6 @@
 package lazecoding.capture.controller;
 
+import lazecoding.capture.constant.StreamConstant;
 import lazecoding.capture.exception.NilParamException;
 import lazecoding.capture.model.BatchRequest;
 import lazecoding.capture.model.LogRecord;
@@ -9,9 +10,14 @@ import org.elasticsearch.search.SearchHit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.connection.stream.ObjectRecord;
+import org.springframework.data.redis.connection.stream.RecordId;
+import org.springframework.data.redis.connection.stream.StreamRecords;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +33,9 @@ public class LogController {
     @Autowired
     private LogRecordSearch logRecordSearch;
 
+    @Resource
+    private RedisTemplate<String, Object> redisTemplate;
+
     private static final Logger logger = LoggerFactory.getLogger(LogController.class);
 
     /**
@@ -38,8 +47,14 @@ public class LogController {
         boolean isSuccess = false;
         ResultBean resultBean = new ResultBean();
         String message = "";
+        RecordId recordId = null;
         try {
-            isSuccess = logRecordSearch.batch(batchRequest);
+            ObjectRecord<String, BatchRequest> record = StreamRecords.newRecord()
+                    .in(StreamConstant.LOG_RECORD_STREAM.getStream())
+                    .ofObject(batchRequest)
+                    .withId(RecordId.autoGenerate());
+            recordId = redisTemplate.opsForStream().add(record);
+            isSuccess = true;
         } catch (NilParamException e) {
             isSuccess = false;
             logger.error("接口:[/api/log/batch]", e);
@@ -51,12 +66,13 @@ public class LogController {
         }
         resultBean.setSuccess(isSuccess);
         resultBean.setMessage(message);
+        resultBean.setValue(recordId);
         return resultBean;
     }
 
     /**
      * 检索 临时接口
-     *
+     * <p>
      * https://segmentfault.com/a/1190000016830796
      */
     @RequestMapping(value = "/api/log/search", method = RequestMethod.GET)

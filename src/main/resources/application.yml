@@ -8,15 +8,26 @@ server:
 
 spring:
   application:
-    name: captureHead
+    name: capture
   redis:
     host: 127.0.0.1
     port: 6379
     password:
-    database: 11
+    database: 15
     lettuce:
       pool:
         max-active: 16
         max-wait: 3000ms
         max-idle: 16
         min-idle: 0
+
+
+
+project:
+  search:
+    addresses:
+      # 集群下配置多个
+      - ip: 127.0.0.1
+        port: 9200
+    username:
+    password:
