@@ -131,6 +131,7 @@ public class StreamInitListener implements ApplicationRunner, DisposableBean {
                         }
                     } catch (Exception e) {
                         logger.debug("log-record-consumer cost fail stream:[{}],id:[{}]", stream, id);
+                        logger.error("log-record-consumer cost fail", e);
                     }
                 });
         // 初始化全局变量

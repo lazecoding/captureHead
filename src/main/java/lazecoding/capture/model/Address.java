@@ -3,7 +3,7 @@ package lazecoding.capture.model;
 /**
  * IP + Port
  *
- * @author liux
+ * @author lazecoding
  */
 public class Address {
 

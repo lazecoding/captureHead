@@ -19,6 +19,9 @@ public enum IndexConstant {
                     "    \"level\": {\n" +
                     "      \"type\": \"keyword\"\n" +
                     "    },\n" +
+                    "    \"levelOrder\": {\n" +
+                    "      \"type\": \"integer\"\n" +
+                    "    },\n" +
                     "    \"logInfo\": {\n" +
                     "      \"type\": \"text\"\n" +
                     "    },\n" +
