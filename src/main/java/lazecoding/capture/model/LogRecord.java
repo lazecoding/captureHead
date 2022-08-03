@@ -48,6 +48,11 @@ public class LogRecord {
     private String logInfo = "";
 
     /**
+     * 页面定位
+     */
+    private String location;
+
+    /**
      * 时间戳
      */
     private Long ctime = 0L;
@@ -116,6 +121,14 @@ public class LogRecord {
         this.logInfo = logInfo;
     }
 
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
     public Long getCtime() {
         return ctime;
     }
@@ -135,6 +148,7 @@ public class LogRecord {
                 ", category='" + category + '\'' +
                 ", level='" + level + '\'' +
                 ", logInfo='" + logInfo + '\'' +
+                ", location='" + location + '\'' +
                 ", ctime=" + ctime +
                 '}';
     }

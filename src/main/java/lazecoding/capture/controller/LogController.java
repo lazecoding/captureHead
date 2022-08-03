@@ -16,6 +16,7 @@ import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -58,6 +59,15 @@ public class LogController {
             if (ObjectUtils.isEmpty(appModel)) {
                 throw new NilParamException("AppModel is nil");
             }
+            if (!StringUtils.hasText(appModel.getApp())){
+                throw new NilParamException("AppModel:[app] is nil");
+            }
+            if (!StringUtils.hasText(appModel.getVersion())){
+                appModel.setVersion("default");
+            }
+            if (!StringUtils.hasText(appModel.getNamespace())){
+                appModel.setNamespace("default");
+            }
             List<LogModel> logModelList = batchRequest.getLogModelList();
             if (CollectionUtils.isEmpty(logModelList)) {
                 throw new NilParamException("LogModelList is nil");
@@ -82,6 +92,35 @@ public class LogController {
         resultBean.setValue(recordId);
         return resultBean;
     }
+
+    /**
+     * 总数
+     */
+    @RequestMapping(value = "/api/log/count", method = RequestMethod.GET)
+    @ResponseBody
+    public ResultBean count(LogQueryParam logQueryParam) {
+        boolean isSuccess = false;
+        ResultBean resultBean = new ResultBean();
+        String message = "";
+        Long count = 0L;
+        try {
+            count = logRecordSearch.count(logQueryParam);
+            isSuccess = true;
+        } catch (NilParamException | IllegalLogLevelException | IllegalLogCategoryException e) {
+            isSuccess = false;
+            logger.error("接口:[/api/log/count]", e);
+            message = e.getMessage();
+        } catch (Exception e) {
+            isSuccess = false;
+            logger.error("接口:[/api/log/count]", e);
+            message = "系统异常";
+        }
+        resultBean.setValue(count);
+        resultBean.setSuccess(isSuccess);
+        resultBean.setMessage(message);
+        return resultBean;
+    }
+
 
     /**
      * 检索 临时接口

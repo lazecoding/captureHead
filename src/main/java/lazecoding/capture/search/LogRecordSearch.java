@@ -6,7 +6,6 @@ import lazecoding.capture.constant.LogLevelConstant;
 import lazecoding.capture.exception.IllegalLogLevelException;
 import lazecoding.capture.exception.NilParamException;
 import lazecoding.capture.model.*;
-import lazecoding.capture.util.PageInfo;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.bulk.BulkRequest;
@@ -41,10 +40,7 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -111,9 +107,7 @@ public class LogRecordSearch {
 
     /**
      * delete index
-     *
-     * @return
-     */
+     **/
     public boolean deleteIndex() {
         String index = IndexConstant.LOG_RECORD.getIndex();
         DeleteIndexRequest deleteIndexRequest = new DeleteIndexRequest(index);
@@ -135,9 +129,7 @@ public class LogRecordSearch {
 
     /**
      * 把实体转化为 Map
-     *
-     * @return
-     */
+     **/
     private void conversionRecordToMap(LogModel logModel, Map<String, Object> source) {
         if (source == null) {
             return;
@@ -147,14 +139,13 @@ public class LogRecordSearch {
         source.put("level", logModel.getLevel());
         source.put("levelOrder", LogLevelConstant.getLevelOrder(logModel.getLevel()));
         source.put("logInfo", logModel.getLogInfo());
+        source.put("location", logModel.getLocation());
         source.put("ctime", logModel.getCtime());
     }
 
     /**
      * batch doc to index
-     *
-     * @return
-     */
+     **/
     public boolean batch(BatchRequest batchRequest) {
         // 没有实际请求，则直接返回 true
         if (ObjectUtils.isEmpty(batchRequest)) {
@@ -208,19 +199,16 @@ public class LogRecordSearch {
     }
 
     /**
-     * search
+     * 获取查询的基础 BoolQueryBuilder
      *
-     * @return
+     * @param logQueryParam 查询对象
+     * @return BoolQueryBuilder
      */
-    public LogSearchResponse search(LogQueryParam logQueryParam) {
-        String index = IndexConstant.LOG_RECORD.getIndex();
+    private BoolQueryBuilder getBaseQueryBuilder(LogQueryParam logQueryParam) {
         if (ObjectUtils.isEmpty(logQueryParam)) {
             throw new NilParamException("LogQueryParam is nil");
         }
         // 处理 logQueryParam 默认值
-        if (logQueryParam.getPageNum() == null) {
-            logQueryParam.setPageNum(0);
-        }
         if (logQueryParam.getPageSize() == null) {
             logQueryParam.setPageSize(20);
         }
@@ -254,42 +242,58 @@ public class LogRecordSearch {
             RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery("levelOrder").lte(LogLevelConstant.getLevelOrder(logQueryParam.getLevel()));
             queryBuilder.filter().add(rangeQueryBuilder);
         }
-        if (logQueryParam.getStartTime() != null || logQueryParam.getEndTime() != null) {
+        if (StringUtils.hasText(logQueryParam.getLocation())) {
+            queryBuilder.must(QueryBuilders.termQuery("location", logQueryParam.getLocation()));
+        }
+
+        if (logQueryParam.getCtime() != null) {
             RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery("ctime");
-            if (logQueryParam.getStartTime() != null) {
-                rangeQueryBuilder.gte(logQueryParam.getStartTime());
-            }
-            if (logQueryParam.getEndTime() != null) {
-                rangeQueryBuilder.lte(logQueryParam.getEndTime());
+            if (logQueryParam.getOrderType() == 1) {
+                // 正序：>= ctime
+                rangeQueryBuilder.gte(logQueryParam.getCtime());
+            } else {
+                // 倒序：<= ctime
+                rangeQueryBuilder.lte(logQueryParam.getCtime());
             }
             queryBuilder.filter().add(rangeQueryBuilder);
         }
 
-        // count 获取总数
-        Long totolNum = 0L;
+        return queryBuilder;
+    }
+
+    /**
+     * count
+     */
+    public Long count(LogQueryParam logQueryParam) {
+        BoolQueryBuilder queryBuilder = getBaseQueryBuilder(logQueryParam);
+        String index = IndexConstant.LOG_RECORD.getIndex();
         try {
             CountRequest countRequest = new CountRequest(index);
             countRequest.query(queryBuilder);
             CountResponse count = restHighLevelClient.count(countRequest, RequestOptions.DEFAULT);
-            totolNum = count.getCount();
+            return count.getCount();
         } catch (IOException e) {
             throw new RuntimeException("RestHighLevelClient Count ERROR");
         }
-        PageInfo pageInfo = new PageInfo(logQueryParam.getPageNum(), logQueryParam.getPageSize(), totolNum.intValue());
-        List<LogRecord> logRecordList = new LinkedList<>();
-        LogSearchResponse logSearchResponse = new LogSearchResponse(logRecordList, pageInfo);
+    }
 
-        // 如果没数据，直接返回
-        if (totolNum == 0) {
-            return logSearchResponse;
+    /**
+     * search
+     */
+    public LogSearchResponse search(LogQueryParam logQueryParam) {
+        BoolQueryBuilder queryBuilder = getBaseQueryBuilder(logQueryParam);
+        String index = IndexConstant.LOG_RECORD.getIndex();
+        Long nextQueryCtime = null;
+        if (logQueryParam.getCtime() != null) {
+            // 下一次查询默认时间(如果没匹配的数据，应该是保持当前的查询条件)
+            nextQueryCtime = logQueryParam.getCtime();
         }
-
+        List<LogRecord> logRecordList = new LinkedList<>();
+        LogSearchResponse logSearchResponse = new LogSearchResponse(logRecordList, nextQueryCtime);
         // search
         SearchRequest searchRequest = new SearchRequest(index);
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(queryBuilder);
-        // 翻页
-        searchSourceBuilder.from(pageInfo.getStartNum()).size(pageInfo.getPageSize());
+        searchSourceBuilder.query(queryBuilder).size(logQueryParam.getPageSize());
         // soft
         searchSourceBuilder.sort(new FieldSortBuilder("ctime").order(logQueryParam.getOrderType() == 1 ? SortOrder.ASC : SortOrder.DESC));
         searchSourceBuilder.timeout(new TimeValue(60, TimeUnit.SECONDS));
@@ -303,31 +307,91 @@ public class LogRecordSearch {
         SearchHit[] hits = searchResponse.getHits().getHits();
         if (hits != null && hits.length > 0) {
             LogRecord logRecord;
+            Set<String> existLog = new HashSet<>();
+            // 1.处理范围信息
+            // 最后一条信息的时间戳
+            Long lastCtime = 0L;
             for (SearchHit hit : hits) {
-                Map<String, Object> sourceAsMap = hit.getSourceAsMap();
-                if (CollectionUtils.isEmpty(sourceAsMap)) {
+                logRecord = sourceAsLog(hit);
+                if (ObjectUtils.isEmpty(logRecord)) {
                     continue;
                 }
-                logRecord = new LogRecord();
-                logRecord.setApp((String) sourceAsMap.get("app"));
-                logRecord.setDeviceInfo((String) sourceAsMap.get("deviceInfo"));
-                logRecord.setClientId((String) sourceAsMap.get("clientId"));
-                logRecord.setVersion((String) sourceAsMap.get("version"));
-                logRecord.setNamespace((String) sourceAsMap.get("namespace"));
-                logRecord.setCategory((String) sourceAsMap.get("category"));
-                logRecord.setLevel((String) sourceAsMap.get("level"));
-                logRecord.setLogInfo((String) sourceAsMap.get("logInfo"));
-                Object ctime = (Object) sourceAsMap.get("ctime");
-                if (ctime instanceof Long) {
-                    logRecord.setCtime((Long) ctime);
-                } else if (ctime instanceof Integer) {
-                    logRecord.setCtime(((Integer) ctime).longValue());
-                } else {
-                    logRecord.setCtime(0L);
-                }
+                lastCtime = logRecord.getCtime();
                 logRecordList.add(logRecord);
+                // 去重
+                String docId = hit.getId();
+                existLog.add(docId);
             }
+            if (lastCtime != 0L) {
+                // 2.处理最后一条信息的时间戳（查询出所有这个时间的数据）
+                // = ctime
+                queryBuilder.must(QueryBuilders.termQuery("ctime", lastCtime));
+                searchSourceBuilder.query(queryBuilder);
+                searchSourceBuilder.size(10000);
+                searchRequest.source(searchSourceBuilder);
+                try {
+                    searchResponse = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
+                } catch (IOException e) {
+                    throw new RuntimeException("RestHighLevelClient Search ERROR");
+                }
+                hits = searchResponse.getHits().getHits();
+                if (hits != null && hits.length > 0) {
+                    for (SearchHit hit : hits) {
+                        // 去重
+                        String docId = hit.getId();
+                        if (existLog.contains(docId)) {
+                            continue;
+                        }
+                        logRecord = sourceAsLog(hit);
+                        if (ObjectUtils.isEmpty(logRecord)) {
+                            continue;
+                        }
+                        logRecordList.add(logRecord);
+                        existLog.add(docId);
+                    }
+                }
+            }
+            existLog.clear();
+            // 更新下一次查询时间
+            if (logQueryParam.getOrderType() == 1) {
+                nextQueryCtime = lastCtime + 1;
+            } else {
+                nextQueryCtime = lastCtime - 1;
+            }
+            logSearchResponse.setNextQueryCtime(nextQueryCtime);
         }
         return logSearchResponse;
+    }
+
+    /**
+     * search hit 转换为 LogRecord
+     */
+    private LogRecord sourceAsLog(SearchHit hit) {
+        if (ObjectUtils.isEmpty(hit)) {
+            return null;
+        }
+        Map<String, Object> sourceAsMap = hit.getSourceAsMap();
+        if (CollectionUtils.isEmpty(sourceAsMap)) {
+            return null;
+        }
+        LogRecord logRecord = new LogRecord();
+        logRecord.setApp((String) sourceAsMap.get("app"));
+        logRecord.setDeviceInfo((String) sourceAsMap.get("deviceInfo"));
+        logRecord.setClientId((String) sourceAsMap.get("clientId"));
+        logRecord.setVersion((String) sourceAsMap.get("version"));
+        logRecord.setNamespace((String) sourceAsMap.get("namespace"));
+        logRecord.setCategory((String) sourceAsMap.get("category"));
+        logRecord.setLevel((String) sourceAsMap.get("level"));
+        logRecord.setLogInfo((String) sourceAsMap.get("logInfo"));
+        logRecord.setLocation((String) sourceAsMap.get("location"));
+        Object ctime = (Object) sourceAsMap.get("ctime");
+        if (ctime instanceof Long) {
+            logRecord.setCtime((Long) ctime);
+        } else if (ctime instanceof Integer) {
+            logRecord.setCtime(((Integer) ctime).longValue());
+        } else {
+            logRecord.setCtime(0L);
+        }
+        return logRecord;
     }
 }

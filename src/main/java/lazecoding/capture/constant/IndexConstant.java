@@ -25,6 +25,9 @@ public enum IndexConstant {
                     "    \"logInfo\": {\n" +
                     "      \"type\": \"text\"\n" +
                     "    },\n" +
+                    "    \"location\": {\n" +
+                    "      \"type\": \"keyword\"\n" +
+                    "    },\n" +
                     "    \"ctime\": {\n" +
                     "      \"type\": \"long\"\n" +
                     "    },\n" +

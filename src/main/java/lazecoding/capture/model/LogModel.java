@@ -23,6 +23,11 @@ public class LogModel {
     private String logInfo = "";
 
     /**
+     * 页面定位
+     */
+    private String location = "";
+
+    /**
      * 时间戳
      */
     private Long ctime = 0L;
@@ -49,6 +54,14 @@ public class LogModel {
 
     public void setLogInfo(String logInfo) {
         this.logInfo = logInfo;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
     }
 
     public Long getCtime() {

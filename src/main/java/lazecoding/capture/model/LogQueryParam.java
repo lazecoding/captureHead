@@ -38,24 +38,19 @@ public class LogQueryParam {
     private String level = "";
 
     /**
-     * 开始时间
+     * 页面定位
      */
-    private Long startTime;
+    private String location;
 
     /**
-     * 结束时间
+     * 创建时间戳
      */
-    private Long endTime;
+    private Long ctime;
 
     /**
      * 排序方式： 0 时间倒序；1 时间正序
      */
     private Integer orderType = 0;
-
-    /**
-     * 页码
-     */
-    private Integer pageNum = 1;
 
     /**
      * 每页数量
@@ -111,20 +106,20 @@ public class LogQueryParam {
         this.level = level;
     }
 
-    public Long getStartTime() {
-        return startTime;
+    public String getLocation() {
+        return location;
     }
 
-    public void setStartTime(Long startTime) {
-        this.startTime = startTime;
+    public void setLocation(String location) {
+        this.location = location;
     }
 
-    public Long getEndTime() {
-        return endTime;
+    public Long getCtime() {
+        return ctime;
     }
 
-    public void setEndTime(Long endTime) {
-        this.endTime = endTime;
+    public void setCtime(Long ctime) {
+        this.ctime = ctime;
     }
 
     public Integer getOrderType() {
@@ -135,19 +130,27 @@ public class LogQueryParam {
         this.orderType = orderType;
     }
 
-    public Integer getPageNum() {
-        return pageNum;
-    }
-
-    public void setPageNum(Integer pageNum) {
-        this.pageNum = pageNum;
-    }
-
     public Integer getPageSize() {
         return pageSize;
     }
 
     public void setPageSize(Integer pageSize) {
         this.pageSize = pageSize;
+    }
+
+    @Override
+    public String toString() {
+        return "LogQueryParam{" +
+                "app='" + app + '\'' +
+                ", version='" + version + '\'' +
+                ", clientId='" + clientId + '\'' +
+                ", namespace='" + namespace + '\'' +
+                ", category='" + category + '\'' +
+                ", level='" + level + '\'' +
+                ", location='" + location + '\'' +
+                ", ctime=" + ctime +
+                ", orderType=" + orderType +
+                ", pageSize=" + pageSize +
+                '}';
     }
 }

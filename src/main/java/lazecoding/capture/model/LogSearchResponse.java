@@ -1,7 +1,5 @@
 package lazecoding.capture.model;
 
-import lazecoding.capture.util.PageInfo;
-
 import java.util.List;
 
 /**
@@ -11,16 +9,23 @@ import java.util.List;
  */
 public class LogSearchResponse {
 
+    /**
+     * Log 记录
+     */
     private List<LogRecord> logRecordList;
 
-    private PageInfo pageInfo;
+    /**
+     * 下一次查询时间戳
+     */
+    private Long nextQueryCtime;
 
     public LogSearchResponse() {
     }
 
-    public LogSearchResponse(List<LogRecord> logRecordList, PageInfo pageInfo) {
+
+    public LogSearchResponse(List<LogRecord> logRecordList, Long nextQueryCtime) {
         this.logRecordList = logRecordList;
-        this.pageInfo = pageInfo;
+        this.nextQueryCtime = nextQueryCtime;
     }
 
     public List<LogRecord> getLogRecordList() {
@@ -31,19 +36,20 @@ public class LogSearchResponse {
         this.logRecordList = logRecordList;
     }
 
-    public PageInfo getPageInfo() {
-        return pageInfo;
+
+    public Long getNextQueryCtime() {
+        return nextQueryCtime;
     }
 
-    public void setPageInfo(PageInfo pageInfo) {
-        this.pageInfo = pageInfo;
+    public void setNextQueryCtime(Long nextQueryCtime) {
+        this.nextQueryCtime = nextQueryCtime;
     }
 
     @Override
     public String toString() {
         return "LogSearchResponse{" +
                 "logRecordList=" + logRecordList +
-                ", pageInfo=" + pageInfo +
+                ", nextQueryCtime=" + nextQueryCtime +
                 '}';
     }
 }
