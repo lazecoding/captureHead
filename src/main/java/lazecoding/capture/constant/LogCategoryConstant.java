@@ -36,14 +36,14 @@ public enum LogCategoryConstant {
     AJAX_ERROR("ajax_error", "ajax 异步请求错误"),
 
     /**
-     * 控制台错误 console.info
+     * 控制台信息 console.info
      */
-    CONSOLE_info("console_info", "控制台错误 console.info"),
+    CONSOLE_info("console_info", "控制台信息 console.info"),
 
     /**
-     * 控制台错误 console.warn
+     * 控制台警告 console.warn
      */
-    CONSOLE_warn("console_warn", "控制台错误 console.warn"),
+    CONSOLE_warn("console_warn", "控制台警告 console.warn"),
 
     /**
      * 控制台错误 console.error
@@ -53,7 +53,7 @@ public enum LogCategoryConstant {
     /**
      * 跨域 js 错误
      */
-    CROSS_SRCIPT_ERROR("cross_srcipt_error", "跨域 js 错误"),
+    CROSS_SCRIPT_ERROR("cross_script_error", "跨域 js 错误"),
 
     /**
      * 未知异常

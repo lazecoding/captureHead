@@ -50,7 +50,7 @@ public class LogRecord {
     /**
      * 页面定位
      */
-    private String location;
+    private String location = "";
 
     /**
      * 时间戳
