@@ -20,6 +20,7 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -61,13 +62,11 @@ public class ElasticSearchConfig {
             logger.info("project.search.addresses is nil");
             return null;
         }
-        HttpHost[] hosts = new HttpHost[addresses.size()];
-        int index = 0;
+        List<HttpHost> hostList = new ArrayList<>();
         for (Address address : addresses) {
-            hosts[index++] = new HttpHost(address.getIp(), address.getPort(), scheme);
+            hostList.add(new HttpHost(address.getIp(), address.getPort(), scheme));
         }
-
-        RestClientBuilder builder = RestClient.builder(hosts);
+        RestClientBuilder builder = RestClient.builder(hostList.toArray(new HttpHost[0]));
         CredentialsProvider credentialsProvider = null;
         // 账号密码
         if (StringUtils.hasText(projectSearchConfig.getUsername()) && StringUtils.hasText(projectSearchConfig.getPassword())) {
